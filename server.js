@@ -32,6 +32,30 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Enable CORS
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Serve static files from the React app in production
+if (process.env.NODE_ENV === 'production') {
+  // This assumes your frontend build is in the 'dist' directory
+  const frontendPath = path.join(__dirname, '../frontend/dist');
+  
+  // Serve static files
+  app.use(express.static(frontendPath));
+  
+  // Handle React routing, return all requests to the React app
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
+
 // CORS Configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -249,11 +273,16 @@ async function testSupabaseConnection() {
 
 testSupabaseConnection();
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-});
+// Start server only if not in Vercel environment
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+  });
+}
+
+// Export the Express API for Vercel
+module.exports = app;
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
