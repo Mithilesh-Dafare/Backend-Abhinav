@@ -11,110 +11,20 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-// Import email service (optional - won't break if email not configured)
-let sendUserConfirmation, sendAdminNotification;
-try {
-  const emailModule = await import('./emailService.js');
-  sendUserConfirmation = emailModule.sendUserConfirmation || (() => ({}));
-  sendAdminNotification = emailModule.sendAdminNotification || (() => ({}));
-} catch (error) {
-  console.warn('Email service not available:', error.message);
-  // Create dummy functions if email service fails to load
-  sendUserConfirmation = async () => ({ success: false, message: 'Email not configured' });
-  sendAdminNotification = async () => ({ success: false, message: 'Email not configured' });
-}
-
+// Initialize Express
 const app = express();
-const PORT = process.env.PORT || 3001;
 
-// Enable CORS
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
-
-// Parse JSON bodies
-app.use(express.json());
-
-// Serve static files
-const staticDirs = [
-  path.join(__dirname, 'public'),        // For static files in backend
-  path.join(__dirname, '../frontend/dist')  // For frontend build files
-];
-
-// Try each static directory until one works
-let staticServed = false;
-for (const dir of staticDirs) {
-  try {
-    if (fs.existsSync(dir)) {
-      console.log(`Serving static files from: ${dir}`);
-      app.use(express.static(dir));
-      staticServed = true;
-    }
-  } catch (err) {
-    console.warn(`Could not serve from ${dir}:`, err.message);
-  }
-}
-
-// If no static directory was found, log a warning
-if (!staticServed) {
-  console.warn('No static directory found. Check your build process.');
-}
-
-// API routes should be defined before the catch-all route
-// ... your existing API routes here ...
-
-// Handle client-side routing - serve index.html for all other GET requests
-// Use a proper path pattern instead of '*' to avoid path-to-regexp error
-app.get('/*', (req, res, next) => {
-  // Skip API routes
-  if (req.path.startsWith('/api/')) {
-    return next();
-  }
-
-  // Try to serve index.html from frontend build first
-  const frontendIndex = path.join(__dirname, '../frontend/dist/index.html');
-  const backendIndex = path.join(__dirname, 'public/index.html');
-  
-  if (fs.existsSync(frontendIndex)) {
-    return res.sendFile(frontendIndex);
-  } else if (fs.existsSync(backendIndex)) {
-    return res.sendFile(backendIndex);
-  }
-  
-  // If no index.html found, return a 404
-  next();
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found', path: req.path });
-});
+// Middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // CORS Configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:3000', // For local development
-  'http://localhost:3001'  // For local backend
-].filter(Boolean);
-
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', true);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   
-  // Handle preflight requests
+  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -122,13 +32,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// Body parser middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-// Serve static files from the frontend build in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// Serve static files from frontend build
+const staticPath = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(staticPath)) {
+  console.log(`✓ Serving static files from: ${staticPath}`);
+  app.use(express.static(staticPath));
+} else {
+  console.warn('✗ Frontend build not found. Run "npm run build" in the frontend directory.');
 }
 
 // API routes will go here
