@@ -1,0 +1,28 @@
+{
+  "name": "solar-energy-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Solar Energy Website (Vercel Serverless)",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "vercel-dev": "vercel dev",
+    "deploy": "vercel deploy --prod",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "nodemailer": "^6.10.1"
+  },
+  "devDependencies": {
+    "@vercel/node": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
