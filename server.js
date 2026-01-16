@@ -72,7 +72,13 @@ if (!staticServed) {
 // ... your existing API routes here ...
 
 // Handle client-side routing - serve index.html for all other GET requests
-app.get('*', (req, res) => {
+// Use a proper path pattern instead of '*' to avoid path-to-regexp error
+app.get('/*', (req, res, next) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+
   // Try to serve index.html from frontend build first
   const frontendIndex = path.join(__dirname, '../frontend/dist/index.html');
   const backendIndex = path.join(__dirname, 'public/index.html');
@@ -84,7 +90,12 @@ app.get('*', (req, res) => {
   }
   
   // If no index.html found, return a 404
-  res.status(404).json({ error: 'Not Found' });
+  next();
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not Found', path: req.path });
 });
 
 // CORS Configuration
