@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -42,19 +43,49 @@ app.use((req, res, next) => {
 // Parse JSON bodies
 app.use(express.json());
 
-// Serve static files from the React app in production
-if (process.env.NODE_ENV === 'production') {
-  // This assumes your frontend build is in the 'dist' directory
-  const frontendPath = path.join(__dirname, '../frontend/dist');
-  
-  // Serve static files
-  app.use(express.static(frontendPath));
-  
-  // Handle React routing, return all requests to the React app
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
-  });
+// Serve static files
+const staticDirs = [
+  path.join(__dirname, 'public'),        // For static files in backend
+  path.join(__dirname, '../frontend/dist')  // For frontend build files
+];
+
+// Try each static directory until one works
+let staticServed = false;
+for (const dir of staticDirs) {
+  try {
+    if (fs.existsSync(dir)) {
+      console.log(`Serving static files from: ${dir}`);
+      app.use(express.static(dir));
+      staticServed = true;
+    }
+  } catch (err) {
+    console.warn(`Could not serve from ${dir}:`, err.message);
+  }
 }
+
+// If no static directory was found, log a warning
+if (!staticServed) {
+  console.warn('No static directory found. Check your build process.');
+}
+
+// API routes should be defined before the catch-all route
+// ... your existing API routes here ...
+
+// Handle client-side routing - serve index.html for all other GET requests
+app.get('*', (req, res) => {
+  // Try to serve index.html from frontend build first
+  const frontendIndex = path.join(__dirname, '../frontend/dist/index.html');
+  const backendIndex = path.join(__dirname, 'public/index.html');
+  
+  if (fs.existsSync(frontendIndex)) {
+    return res.sendFile(frontendIndex);
+  } else if (fs.existsSync(backendIndex)) {
+    return res.sendFile(backendIndex);
+  }
+  
+  // If no index.html found, return a 404
+  res.status(404).json({ error: 'Not Found' });
+});
 
 // CORS Configuration
 const allowedOrigins = [
